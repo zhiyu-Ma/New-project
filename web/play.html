@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>石桥镇</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1b1d1f;
+      --muted: #66707a;
+      --line: #d8ded7;
+      --paper: #f7f6f0;
+      --panel: #ffffff;
+      --accent: #2d6f61;
+      --accent-2: #9b4b32;
+      --focus: #f0c65a;
+      --shadow: 0 16px 40px rgba(31, 39, 35, .12);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: linear-gradient(180deg, #e9eee8 0%, #f7f6f0 42%, #f2eee5 100%);
+      color: var(--ink);
+      font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button, select { font: inherit; }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(240px, 320px) minmax(0, 1fr) minmax(260px, 340px);
+      gap: 16px;
+      width: min(1440px, 100%);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    .sidebar, .main, .ledger { min-width: 0; }
+
+    .town-band {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .town-art {
+      height: 156px;
+      background:
+        radial-gradient(circle at 70% 22%, rgba(240,198,90,.9) 0 34px, transparent 35px),
+        linear-gradient(135deg, rgba(45,111,97,.23), rgba(155,75,50,.18)),
+        linear-gradient(180deg, #dde8df, #f7f6f0);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .roofline {
+      position: absolute;
+      inset: 72px 12px auto;
+      height: 58px;
+      background:
+        linear-gradient(135deg, transparent 0 21px, #8b4a35 22px 34px, transparent 35px),
+        linear-gradient(45deg, transparent 0 21px, #315f58 22px 34px, transparent 35px);
+      background-size: 82px 58px, 96px 58px;
+      opacity: .9;
+    }
+
+    .town-copy { padding: 14px; }
+
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 26px; line-height: 1.15; }
+    h2 { font-size: 17px; margin-bottom: 10px; }
+    h3 { font-size: 15px; }
+    .muted { color: var(--muted); }
+
+    .panel {
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(31, 39, 35, .08);
+    }
+
+    .clock {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .metric {
+      min-height: 64px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      background: #fbfaf6;
+    }
+
+    .metric strong { display: block; font-size: 20px; }
+
+    .map { display: grid; gap: 8px; }
+
+    .place {
+      width: 100%;
+      min-height: 54px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfaf6;
+      color: var(--ink);
+      text-align: left;
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .place[aria-current="true"] {
+      border-color: var(--accent);
+      box-shadow: inset 4px 0 0 var(--accent);
+    }
+
+    .main { display: flex; flex-direction: column; gap: 14px; }
+
+    /* Loading bar */
+    .loading-bar {
+      height: 3px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--focus), var(--accent));
+      background-size: 200% 100%;
+      animation: slide 1.2s linear infinite;
+      display: none;
+    }
+    .loading-bar.active { display: block; }
+    @keyframes slide { 0% { background-position: 0% 0%; } 100% { background-position: -200% 0%; } }
+
+    .scene {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .scene-header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfaf6;
+    }
+
+    .scene-body { padding: 16px; }
+
+    .people {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .npc {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .npc small { display: block; color: var(--muted); margin-top: 2px; }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .action {
+      min-height: 56px;
+      border: 1px solid #b7c5bd;
+      border-radius: 8px;
+      background: #eef5f1;
+      color: #123d35;
+      cursor: pointer;
+      line-height: 1.3;
+      padding: 8px;
+    }
+
+    .action:hover:not(:disabled), .place:hover:not(:disabled) {
+      border-color: var(--accent);
+    }
+
+    .action:disabled, .place:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .story {
+      flex: 1;
+      min-height: 280px;
+      max-height: 46vh;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .entry {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .entry:last-child { border-bottom: 0; }
+    .entry strong { color: var(--accent-2); }
+
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #fbfaf6;
+      color: var(--muted);
+    }
+
+    .secret {
+      border-left: 4px solid var(--focus);
+      padding: 10px;
+      background: #fffaf0;
+      border-radius: 4px;
+      margin-top: 8px;
+    }
+
+    .secret.undiscovered {
+      border-left-color: var(--line);
+      background: #f9f9f7;
+      color: var(--muted);
+    }
+
+    .secret.new-discovery {
+      animation: glow 2s ease-out;
+    }
+
+    @keyframes glow {
+      0% { background: #fff3cc; border-left-color: #e8a000; }
+      100% { background: #fffaf0; border-left-color: var(--focus); }
+    }
+
+    .progress {
+      height: 10px;
+      border-radius: 999px;
+      background: #e1e5df;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent), var(--focus));
+      transition: width .4s ease;
+    }
+
+    #connectError {
+      display: none;
+      padding: 2rem;
+      max-width: 500px;
+      margin: 4rem auto;
+      background: #fff3f3;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      color: #7f1d1d;
+    }
+
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .people, .actions { grid-template-columns: 1fr; }
+      .story { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="connectError">
+    <strong>无法连接游戏服务器</strong>
+    <p id="connectErrorMsg" style="margin-top:8px"></p>
+    <p style="margin-top:12px;font-size:13px;color:#991b1b">
+      请确认已运行：<code>python scripts/game_server.py</code>
+    </p>
+  </div>
+
+  <div class="app" id="app" style="display:none">
+    <aside class="sidebar">
+      <section class="town-band">
+        <div class="town-art" aria-hidden="true"><div class="roofline"></div></div>
+        <div class="town-copy">
+          <h1 id="townName">石桥镇</h1>
+          <p class="muted" id="townAtmo"></p>
+          <div class="clock">
+            <div class="metric"><span class="muted">天数</span><strong id="day">1</strong></div>
+            <div class="metric"><span class="muted">时段</span><strong id="timeLabel">上午</strong></div>
+            <div class="metric"><span class="muted">线索</span><strong id="clueCount">0</strong></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>地点</h2>
+        <div class="map" id="map"></div>
+      </section>
+    </aside>
+
+    <main class="main">
+      <div class="loading-bar" id="loadingBar"></div>
+
+      <section class="scene">
+        <div class="scene-header">
+          <div>
+            <h2 id="placeName"></h2>
+            <p class="muted" id="placeDescription"></p>
+          </div>
+          <button class="action" id="restButton" type="button">等一会</button>
+        </div>
+        <div class="scene-body">
+          <div class="chips" id="knownEvents"></div>
+          <div class="people" id="people"></div>
+          <div class="actions" id="actionButtons">
+            <button class="action" data-action="打听" type="button">打听</button>
+            <button class="action" data-action="观察" type="button">观察</button>
+            <button class="action" data-action="帮忙" type="button">帮忙</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="story" aria-live="polite">
+        <h2>叙述</h2>
+        <div id="storyLog"></div>
+      </section>
+    </main>
+
+    <aside class="ledger">
+      <section class="panel">
+        <h2>主角已知</h2>
+        <div id="knownFacts"></div>
+      </section>
+      <section class="panel">
+        <h2>隐藏线索</h2>
+        <div class="progress"><span id="secretProgress"></span></div>
+        <div id="secrets"></div>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    let state = null;
+    let loading = false;
+    let newlyDiscoveredThisTurn = [];
+
+    // ─── API helpers ──────────────────────────────────────────────────────────
+
+    async function fetchState() {
+      const resp = await fetch('/api/state');
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
+    }
+
+    async function postAction(verb, location, selected_npc) {
+      const resp = await fetch('/api/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ verb, location, selected_npc }),
+      });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      return resp.json();
+    }
+
+    // ─── Loading state ────────────────────────────────────────────────────────
+
+    function setLoading(on) {
+      loading = on;
+      document.getElementById('loadingBar').classList.toggle('active', on);
+      document.querySelectorAll('.action, .place').forEach(b => { b.disabled = on; });
+    }
+
+    // ─── Render ───────────────────────────────────────────────────────────────
+
+    function render() {
+      if (!state) return;
+      const place = state.locations[state.location];
+
+      document.getElementById('day').textContent = String(state.day);
+      document.getElementById('timeLabel').textContent = state.time_label;
+      document.getElementById('clueCount').textContent = String(state.clue_count || 0);
+      document.getElementById('townName').textContent = state.setting.town_name;
+      document.getElementById('townAtmo').textContent = state.setting.atmosphere;
+      document.getElementById('placeName').textContent = place.name;
+      document.getElementById('placeDescription').textContent = place.description;
+
+      // Map
+      document.getElementById('map').innerHTML = Object.entries(state.locations)
+        .map(([id, loc]) => `
+          <button class="place" type="button" data-place="${id}" aria-current="${id === state.location}">
+            <strong>${loc.name}</strong><br>
+            <span class="muted" style="font-size:13px">${loc.description.slice(0, 24)}…</span>
+          </button>
+        `).join('');
+
+      // People in current location
+      document.getElementById('people').innerHTML = (place.regulars || []).map(id => {
+        const npc = state.npcs[id];
+        if (!npc) return '';
+        return `
+          <button class="npc place" type="button" data-npc="${id}"
+            aria-current="${id === state.selected_npc}">
+            <h3>${npc.name}</h3>
+            <small>${npc.role}</small>
+            <p style="margin-top:4px;font-size:13px">${npc.mood}</p>
+          </button>
+        `;
+      }).join('');
+
+      // Action buttons — show target NPC
+      const selectedNpc = state.npcs[state.selected_npc];
+      const npcLabel = selectedNpc ? `<br><small class="muted" style="font-size:12px">${selectedNpc.name}</small>` : '';
+      document.querySelectorAll('#actionButtons [data-action]').forEach(btn => {
+        btn.innerHTML = btn.dataset.action + npcLabel;
+      });
+
+      // Public events chips
+      document.getElementById('knownEvents').innerHTML = (state.public_events || [])
+        .map(e => `<span class="chip">${e.description.slice(0, 14)}</span>`).join('');
+
+      // Known facts
+      document.getElementById('knownFacts').innerHTML = (state.known_facts || [])
+        .map(f => `<p class="secret">${f}</p>`).join('');
+
+      // Secrets
+      const total = Object.keys(state.secrets).length;
+      const found = (state.discovered_secrets || []).length;
+      document.getElementById('secretProgress').style.width = total > 0 ? `${(found / total) * 100}%` : '0%';
+      document.getElementById('secrets').innerHTML = Object.entries(state.secrets)
+        .map(([id, s]) => {
+          const isNew = newlyDiscoveredThisTurn.includes(id);
+          if (s.discovered) {
+            return `<div class="secret${isNew ? ' new-discovery' : ''}">
+              <strong>${s.title}</strong>
+              <p style="margin-top:4px;font-size:13px">${s.text}</p>
+            </div>`;
+          }
+          return `<div class="secret undiscovered">
+            <strong>未揭露线索</strong>
+            <p style="margin-top:4px;font-size:13px">继续打听、观察或帮忙来逼近真相。</p>
+          </div>`;
+        }).join('');
+
+      bindDynamicEvents();
+    }
+
+    function bindDynamicEvents() {
+      document.querySelectorAll('[data-place]').forEach(btn => {
+        btn.addEventListener('click', () => travelTo(btn.dataset.place));
+      });
+      document.querySelectorAll('[data-npc]').forEach(btn => {
+        btn.addEventListener('click', () => selectNpc(btn.dataset.npc));
+      });
+    }
+
+    // ─── Actions ──────────────────────────────────────────────────────────────
+
+    async function travelTo(locId) {
+      if (loading || locId === state.location) return;
+      const regulars = state.locations[locId]?.regulars || [];
+      const firstNpc = regulars[0] || state.selected_npc;
+      await performAction('前往', locId, firstNpc);
+    }
+
+    function selectNpc(npcId) {
+      if (loading) return;
+      state.selected_npc = npcId;
+      addEntry('注视', `你把注意力放在${state.npcs[npcId]?.name || npcId}身上。`);
+      render();
+    }
+
+    async function act(verb) {
+      await performAction(verb, state.location, state.selected_npc);
+    }
+
+    async function performAction(verb, location, selected_npc) {
+      if (loading) return;
+      setLoading(true);
+      newlyDiscoveredThisTurn = [];
+      try {
+        const result = await postAction(verb, location, selected_npc);
+        if (result.narrative) {
+          const npc = state.npcs[selected_npc];
+          const actor = verb === '等待' ? '时间' : verb === '前往' ? '移动' : (npc?.name || verb);
+          addEntry(actor, result.narrative);
+        }
+        newlyDiscoveredThisTurn = result.newly_discovered || [];
+        if (result.state) {
+          state = result.state;
+        }
+        for (const sid of newlyDiscoveredThisTurn) {
+          const secret = state.secrets[sid];
+          if (secret) addEntry('线索揭露', `✦ ${secret.text}`);
+        }
+        render();
+      } catch (e) {
+        addEntry('错误', `请求失败：${e.message}。请检查服务器是否在运行。`);
+      }
+      setLoading(false);
+    }
+
+    // ─── Story log ────────────────────────────────────────────────────────────
+
+    function addEntry(actor, text) {
+      const log = document.getElementById('storyLog');
+      const div = document.createElement('div');
+      div.className = 'entry';
+      div.innerHTML = `<strong>${actor}</strong><p style="margin-top:4px">${text}</p>`;
+      log.prepend(div);
+    }
+
+    // ─── Init ─────────────────────────────────────────────────────────────────
+
+    async function init() {
+      try {
+        state = await fetchState();
+        document.getElementById('app').style.display = '';
+        document.getElementById('connectError').style.display = 'none';
+        render();
+        addEntry('开场', `你回到${state.setting.town_name}整理祖屋。${state.public_events.map(e => e.description).join('。')}。这些事看起来分散，却都压在人情往来里。`);
+      } catch (e) {
+        document.getElementById('connectError').style.display = 'block';
+        document.getElementById('connectErrorMsg').textContent = e.message;
+      }
+    }
+
+    // ─── Event bindings ───────────────────────────────────────────────────────
+
+    document.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => act(btn.dataset.action));
+    });
+    document.getElementById('restButton').addEventListener('click', () => act('等待'));
+
+    init();
+  </script>
+</body>
+</html>

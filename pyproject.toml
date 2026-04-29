@@ -1,0 +1,26 @@
+[project]
+name = "graphiti-text-adventure-demo"
+version = "0.1.0"
+description = "Graphiti knowledge-graph demo harness for emergent text adventure narration."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+real = [
+  "graphiti-core>=0.29.0",
+  "neo4j>=6.1.0",
+  "python-dotenv>=1.2.2",
+  "socksio>=1.0.0",
+]
+graphiti = [
+  "graphiti-core>=0.29.0",
+  "neo4j>=6.1.0",
+  "python-dotenv>=1.2.2",
+  "socksio>=1.0.0",
+]
+
+[project.scripts]
+graphiti-text-adventure = "graphiti_text_adventure.cli:main"
+
+[tool.setuptools]
+packages = ["graphiti_text_adventure"]
