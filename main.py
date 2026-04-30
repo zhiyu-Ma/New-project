@@ -2,7 +2,7 @@
 小镇模拟器 —— 基于 Graphiti 的自定义实体与边类型完整示例 (配置从 .env 读取)
 运行前请确保：
 1. 已创建 .env 文件并填入正确的密钥和连接信息
-2. 已安装所需依赖: graphiti-core pydantic sentence-transformers python-dotenv
+2. 已安装所需依赖: graphiti-core pydantic python-dotenv
 3. Neo4j 已启动并可连接
 """
 
@@ -13,11 +13,12 @@ from typing import Optional
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
-from graphiti import Graphiti
-from graphiti.types import EpisodeType
-from graphiti.utils.search_filters import SearchFilters
+from graphiti_core import Graphiti
+from graphiti_core.nodes import EpisodeType
+from graphiti_core.search.search_filters import SearchFilters
 from graphiti_core.llm_client.config import LLMConfig
-from graphiti_core.embedder.sentence_transformers import SentenceTransformerEmbedder
+from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
+from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 
 # 加载 .env 文件中的环境变量
 load_dotenv()
@@ -35,13 +36,13 @@ class Character(BaseModel):
 
 class Location(BaseModel):
     """A place in the town."""
-    name: str = Field(description="Name of the location.")
+    location_name: str = Field(description="Name of the location.")
     location_type: Optional[str] = Field(default=None, description="e.g., tavern, shop, house, plaza.")
     description: Optional[str] = Field(default=None, description="Short description of the place.")
 
 class Item(BaseModel):
     """A significant item that can be owned or used."""
-    name: str = Field(description="The item's name.")
+    item_name: str = Field(description="The item's name.")
     item_type: Optional[str] = Field(default=None, description="e.g., key, letter, weapon, heirloom.")
 
 # =============================================================================
@@ -134,8 +135,8 @@ NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = os.getenv("NEO4J_USER")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
-# 嵌入模型配置 (本地 Sentence Transformer)
-EMBEDDER_MODEL_NAME = os.getenv("EMBEDDER_MODEL_NAME", "all-MiniLM-L6-v2")
+# 嵌入模型配置
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # 验证必要配置
 if not all([LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD]):
@@ -144,16 +145,22 @@ if not all([LLM_API_KEY, LLM_BASE_URL, LLM_MODEL, NEO4J_URI, NEO4J_USER, NEO4J_P
         "OPENAI_MODEL, NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD"
     )
 
-# 构建 LLM 配置对象
+# 构建 LLM 客户端
 llm_config = LLMConfig(
     api_key=LLM_API_KEY,
     base_url=LLM_BASE_URL,
     model=LLM_MODEL,
     small_model=LLM_SMALL_MODEL
 )
+llm_client = OpenAIGenericClient(config=llm_config)
 
-# 构建本地嵌入器
-embedder = SentenceTransformerEmbedder(model_name=EMBEDDER_MODEL_NAME)
+# 构建嵌入器 (使用 OpenAI 兼容接口)
+embedder_config = OpenAIEmbedderConfig(
+    api_key=LLM_API_KEY,
+    base_url=LLM_BASE_URL,
+    embedding_model=EMBEDDING_MODEL,
+)
+embedder = OpenAIEmbedder(config=embedder_config)
 
 # =============================================================================
 # 5. 模拟 AI 生成故事 (实际项目中替换为真实 LLM 调用)
@@ -242,28 +249,24 @@ class TownSimulator:
         print(f"\n[查询] {self.player_name} 与 {target_name} 的关系：")
         results = await self.graphiti.search(
             query=f"{self.player_name} 和 {target_name} 之间的关系",
-            center_node_entity_type="Character",
-            filters=SearchFilters(edge_filters=["Friends", "Enemies", "Knows", "Lovers"]),
-            num_results=5
+            num_results=5,
+            search_filter=SearchFilters(edge_types=["FRIENDS", "ENEMIES", "KNOWS", "LOVERS"]),
         )
         if not results:
             print("  (暂无记录)")
         for edge in results:
-            fact = edge.facts[0] if edge.facts else ""
-            print(f"  - {edge.edge_type}: {fact}")
+            print(f"  - {edge.name}: {edge.fact}")
         print()
 
     async def query_current_location(self):
         print(f"\n[查询] {self.player_name} 当前所在地：")
         results = await self.graphiti.search(
             query=f"{self.player_name} 当前所在位置",
-            center_node_entity_type="Character",
-            filters=SearchFilters(edge_filters=["CurrentLocation"]),
-            num_results=1
+            num_results=1,
+            search_filter=SearchFilters(edge_types=["CURRENT_LOCATION"]),
         )
         if results:
-            fact = results[0].facts[0] if results[0].facts else ""
-            print(f"  {fact}")
+            print(f"  {results[0].fact}")
         else:
             print("  未知")
         print()
@@ -275,7 +278,7 @@ graphiti = Graphiti(
     uri=NEO4J_URI,
     user=NEO4J_USER,
     password=NEO4J_PASSWORD,
-    llm_config=llm_config,
+    llm_client=llm_client,
     embedder=embedder
 )
 
