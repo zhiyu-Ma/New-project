@@ -26,6 +26,24 @@ except ModuleNotFoundError:
     LLMConfig = None
 
 
+COMPLEX_RESPONSE_FIELDS = {
+    "edges",
+    "entity_resolutions",
+    "extracted_entities",
+    "summaries",
+    "timestamps",
+}
+ENTITY_TYPE_IDS = {
+    "Entity": 0,
+    "Person": 1,
+    "Location": 2,
+    "Topic": 3,
+    "人物": 1,
+    "地点": 2,
+    "话题": 3,
+}
+
+
 class CompatibleOpenAIGenericClient(OpenAIGenericClient):
     """OpenAI-compatible chat client with small repairs for weaker schema adherence."""
 
@@ -70,17 +88,26 @@ class CompatibleOpenAIGenericClient(OpenAIGenericClient):
                     data["timestamps"] = data.pop(key)
                     break
 
+        if "summaries" in expected_fields and "summaries" not in data:
+            for key in ("entity_summaries", "summarized_entities", "summary_list"):
+                if key in data:
+                    data["summaries"] = data.pop(key)
+                    break
+            else:
+                data["summaries"] = []
+
         if isinstance(data.get("extracted_entities"), list):
             for item in data["extracted_entities"]:
                 if isinstance(item, dict) and "name" not in item:
-                    for key in ("entity_name", "entity", "title"):
+                    for key in ("entity_name", "entity_text", "entity", "text", "title"):
                         if key in item:
                             item["name"] = item.pop(key)
                             break
                 if isinstance(item, dict) and "entity_type_id" not in item:
                     for key in ("entity_type", "entity_type_name", "type"):
-                        if item.get(key) == "Entity":
-                            item["entity_type_id"] = 0
+                        entity_type = item.get(key)
+                        if isinstance(entity_type, str) and entity_type in ENTITY_TYPE_IDS:
+                            item["entity_type_id"] = ENTITY_TYPE_IDS[entity_type]
                             break
                 if isinstance(item, dict) and "entity_type_id" in item:
                     item.pop("entity_type", None)
@@ -105,8 +132,56 @@ class CompatibleOpenAIGenericClient(OpenAIGenericClient):
                         if key in item:
                             item["relation_type"] = item.pop(key)
                             break
+                if "fact" not in item:
+                    for key in ("fact_text", "description", "statement", "relationship_description"):
+                        if key in item:
+                            item["fact"] = item.pop(key)
+                            break
+                if "fact" not in item and all(
+                    key in item
+                    for key in ("source_entity_name", "target_entity_name", "relation_type")
+                ):
+                    item["fact"] = (
+                        f"{item['source_entity_name']} "
+                        f"{item['relation_type']} "
+                        f"{item['target_entity_name']}"
+                    )
+
+        had_attribute_wrapper = isinstance(data.get("attributes"), dict)
+        if expected_fields:
+            attributes = data.get("attributes")
+            if isinstance(attributes, dict):
+                for key in expected_fields:
+                    if key not in data and key in attributes:
+                        data[key] = attributes[key]
+
+            data = {key: value for key, value in data.items() if key in expected_fields}
+            if isinstance(data.get("personality"), str):
+                data["personality"] = _split_delimited_text(data["personality"])
+            if had_attribute_wrapper or expected_fields.isdisjoint(COMPLEX_RESPONSE_FIELDS):
+                data = {
+                    key: value
+                    for key, value in data.items()
+                    if _is_neo4j_property_value(value)
+                }
 
         return data
+
+
+def _is_neo4j_property_value(value: Any) -> bool:
+    if isinstance(value, str | int | float | bool):
+        return True
+    if isinstance(value, list):
+        return all(isinstance(item, str | int | float | bool) for item in value)
+    return False
+
+
+def _split_delimited_text(value: str) -> list[str]:
+    normalized = value
+    for delimiter in ("、", "，", ",", "；", ";"):
+        normalized = normalized.replace(delimiter, "|")
+    parts = [part.strip() for part in normalized.split("|") if part.strip()]
+    return parts or [value]
 
 
 class HashEmbedder(EmbedderClient):
